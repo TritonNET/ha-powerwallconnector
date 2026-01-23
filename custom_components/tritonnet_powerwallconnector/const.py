@@ -1,6 +1,6 @@
 """Constants for the TritonNET Powerwall Connector integration."""
 
-DOMAIN = "tritonnet_powerwallconnector"
+DOMAIN = "powerwallconnector"
 
 # Configuration Keys
 CONF_SITENAME = "sitename"

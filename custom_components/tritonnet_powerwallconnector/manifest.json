@@ -1,5 +1,5 @@
 {
-  "domain": "tritonnet_powerwallconnector",
+  "domain": "powerwallconnector",
   "name": "TritonNET Powerwall Connector",
   "version": "1.0.0",
   "documentation": "https://github.com/TritonNET/ha-powerwallconnector.git",
