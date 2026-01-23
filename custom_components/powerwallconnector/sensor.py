@@ -1,38 +1,32 @@
 """Sensor platform for TritonNET Powerwall Connector."""
 from __future__ import annotations
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 
 from .const import DOMAIN, CONF_SITENAME
-
-# Import your sensor classes
 from .sensor_version import TritonNetVersionSensor
 
-async def async_setup_platform(
+async def async_setup_entry(
     hass: HomeAssistant,
-    config: ConfigType,
+    entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
-    discovery_info: DiscoveryInfoType | None = None,
 ) -> None:
-    """Set up the sensor platform."""
-    if discovery_info is None:
-        return
-
-    sitename = discovery_info[CONF_SITENAME]
-    coordinator = hass.data[DOMAIN][sitename]
+    """Set up the sensor platform from a Config Entry."""
+    
+    # Get the coordinator we created in __init__.py
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+    sitename = entry.data[CONF_SITENAME]
 
     sensors = []
 
-    # Instantiate Version Sensor
-    # (Inside __init__, this sensor will call coordinator.register_endpoint)
+    # Instantiate sensors
     sensors.append(
-        TritonNetVersionSensor(coordinator, sitename, "Version")
+        TritonNetVersionSensor(coordinator, sitename, "version")
     )
 
-    # Add sensors to Home Assistant
     async_add_entities(sensors)
-
-    # Force a refresh now that sensors have registered their endpoints.
+    
+    # Force first refresh
     await coordinator.async_request_refresh()
