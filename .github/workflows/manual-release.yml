@@ -60,4 +60,4 @@ jobs:
           gh release create ${{ steps.version.outputs.new_tag }} \
             --generate-notes \
             --title "${{ steps.version.outputs.new_tag }}" \
-            --target "main"
+            --target "master"
