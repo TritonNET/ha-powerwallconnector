@@ -25,3 +25,6 @@ DEFAULT_INFREQUENT = 3600   # 1 Hour
 COORDINATOR_INSTANT = "coord_instant"
 COORDINATOR_REGULAR = "coord_regular"
 COORDINATOR_INFREQUENT = "coord_infrequent"
+
+# API Status Values
+GRID_STATUS_CONNECTED = "SystemGridConnected"
