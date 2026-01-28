@@ -1,33 +1,34 @@
-"""Base entity for TritonNET Powerwall Connector."""
+"""Base Entity for TritonNET."""
 from __future__ import annotations
 
-from homeassistant.helpers.entity import DeviceInfo
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.entity import Entity
+from .client import TritonNetClient
 
-from .const import DOMAIN
-from .coordinator import TritonNetConnectorCoordinator
-from .util import get_device_identifier, get_device_name
-
-class TritonNetEntity(CoordinatorEntity[TritonNetConnectorCoordinator]):
+class TritonNetEntity(Entity):
     """Base class for all TritonNET entities."""
 
     _attr_has_entity_name = True
+    _attr_should_poll = False  # We are Push-based now
 
-    def __init__(self, coordinator: TritonNetConnectorCoordinator, sitename: str) -> None:
-        """Initialize the base entity."""
-        super().__init__(coordinator)
+    def __init__(self, client: TritonNetClient, sitename: str) -> None:
+        """Initialize the entity."""
+        self.client = client
         self._sitename = sitename
-        self._device_identifier = get_device_identifier(sitename)
+        self._attr_device_info = {
+            "identifiers": {( "powerwallconnector", sitename )},
+            "name": f"Powerwall Connector: {sitename}",
+            "manufacturer": "Tesla / TritonNET",
+            "model": "TritonNET Powerwall Monitor (Local)",
+        }
 
     @property
-    def device_info(self) -> DeviceInfo:
-        """Return device information."""
-        return DeviceInfo(
-            identifiers={(DOMAIN, self._device_identifier)},
-            
-            name=get_device_name(self._sitename),
-            
-            manufacturer="Tesla",
-            model="Powerwall Connector Proxy",
-            configuration_url=f"http://{self.coordinator.host}:{self.coordinator.port}",
+    def available(self) -> bool:
+        """Return True if the WebSocket is connected."""
+        return self.client.connected
+
+    async def async_added_to_hass(self) -> None:
+        """Register callbacks when entity is added."""
+        # Ensure this matches the method name in client.py
+        self.async_on_remove(
+            self.client.async_add_listener(self.async_write_ha_state)
         )
