@@ -9,4 +9,4 @@ CONF_PORT = "port"
 DEFAULT_PORT = 8676
 
 KEY_GRID_STATUS = "grid_status"
-VALUE_GRID_CONNECTED = "SystemGridConnected"
+VALUE_GRID_CONNECTED = "UP"
