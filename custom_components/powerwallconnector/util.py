@@ -2,19 +2,31 @@
 from __future__ import annotations
 from datetime import timedelta
 import re
+import os
 import voluptuous as vol
 
 from .const import DOMAIN
 
+def resolve_env_var(value: str | int | None) -> str | int | None:
+    """Check if value is a placeholder like {ENV_VAR} and resolve it."""
+    if not isinstance(value, str):
+        return value
+    
+    # Regex to find pattern {VAR_NAME}
+    match = re.match(r"^\{([a-zA-Z0-9_]+)\}$", value)
+    if match:
+        env_var = match.group(1)
+        resolved = os.environ.get(env_var)
+        if resolved is None:
+            # Fallback or error? For now, return original or empty
+            return value 
+        return resolved
+    return value
+
 def sanitize_id(text: str) -> str:
     """Sanitize a string to be safe for use in unique IDs."""
-    # 1. Lowercase
-    text = text.lower()
-    # 2. Replace spaces with underscores
-    text = text.replace(" ", "_")
-    # 3. Remove non-alphanumeric characters (except underscores)
+    text = text.lower().replace(" ", "_")
     text = re.sub(r"[^a-z0-9_]", "", text)
-    # 4. Remove duplicate underscores
     text = re.sub(r"_+", "_", text)
     return text.strip("_")
 
@@ -32,8 +44,11 @@ def get_device_name(sitename: str) -> str:
 
 def get_entity_unique_id(sitename: str, suffix: str) -> str:
     """Generate a unique ID for a specific entity."""
-    # Example: "home_site_version"
-    return f"{sanitize_id(sitename)}_{sanitize_id(suffix)}"
+    return f"pw_local_con_{sanitize_id(sitename)}_{sanitize_id(suffix)}"
+
+def get_cloud_entity_unique_id(sitename: str, suffix: str) -> str:
+    """Generate a unique ID for a cloud entity."""
+    return f"pw_cloud_con_{sanitize_id(sitename)}_{sanitize_id(suffix)}"
 
 def custom_time_period(value):
     if isinstance(value, int):

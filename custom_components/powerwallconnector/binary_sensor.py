@@ -10,7 +10,7 @@ from homeassistant.components.binary_sensor import (
 )
 
 from .const import DOMAIN, CONF_SITENAME, KEY_GRID_STATUS, VALUE_GRID_CONNECTED
-from .entity import TritonNetEntity
+from .entity_local import TritonNetPowerwallLocalConnectorEntity
 from .client import TritonNetClient
 from .util import get_entity_unique_id
 
@@ -20,14 +20,22 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the binary sensor platform."""
-    client: TritonNetClient = hass.data[DOMAIN][entry.entry_id]
+    data_store = hass.data[DOMAIN][entry.entry_id]
+    
+    # 1. Extract the local client safely
+    client = data_store.get("local_client")
+    
+    # 2. Only add entities if the local client is active
+    if not client:
+        return
+
     sitename = entry.data[CONF_SITENAME]
 
     async_add_entities([
         TritonNetGridStatusBinarySensor(client, sitename)
     ])
 
-class TritonNetGridStatusBinarySensor(TritonNetEntity, BinarySensorEntity):
+class TritonNetGridStatusBinarySensor(TritonNetPowerwallLocalConnectorEntity, BinarySensorEntity):
     """Binary Sensor for Grid Status."""
 
     _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY

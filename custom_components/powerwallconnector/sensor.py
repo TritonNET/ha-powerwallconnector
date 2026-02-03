@@ -19,9 +19,17 @@ from homeassistant.const import (
 )
 
 from .const import DOMAIN, CONF_SITENAME
-from .entity import TritonNetEntity
+from .entity_local import TritonNetPowerwallLocalConnectorEntity
+from .entity_cloud import TritonNetPowerwallCloudConnectorEntity
+
 from .client import TritonNetClient
-from .util import get_entity_unique_id
+from .cloud_sensor_def import CLOUD_SENSOR_DEFINITIONS
+from .postgres_client import TritonNetCloudCoordinator
+from .util import get_entity_unique_id, get_cloud_entity_unique_id
+
+# =============================================================================
+#  MAIN SETUP
+# =============================================================================
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -29,9 +37,48 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the sensor platform."""
-    client: TritonNetClient = hass.data[DOMAIN][entry.entry_id]
+    # Retrieve the data store from __init__.py
+    data_store = hass.data[DOMAIN][entry.entry_id]
     sitename = entry.data[CONF_SITENAME]
+    
+    # Extract clients (they might be None if not configured)
+    local_client: TritonNetClient | None = data_store.get("local_client")
+    cloud_coordinator: TritonNetCloudCoordinator | None = data_store.get("cloud_coordinator")
 
+    sensors = []
+
+    # 1. SETUP LOCAL SENSORS (WebSocket)
+    # -------------------------------------------------------------------------
+    if local_client:
+        # We move the long list of local sensors to a helper function for cleanliness
+        sensors.extend(get_local_sensors(local_client, sitename))
+
+    # 2. SETUP CLOUD SENSORS (PostgreSQL)
+    # -------------------------------------------------------------------------
+    if cloud_coordinator:
+        for definition in CLOUD_SENSOR_DEFINITIONS:
+            # Register the SQL query with the coordinator so it runs every 5 mins
+            cloud_coordinator.register_query(definition["key"], definition["query"])
+            
+            # Create the entity
+            sensors.append(TritonNetCloudSensor(
+                coordinator=cloud_coordinator,
+                sitename=sitename,
+                name=definition["name"],
+                key=definition["key"],
+                unit=definition["unit"],
+                device_class=definition["device_class"],
+                state_class=definition["state_class"]
+            ))
+        
+        # Force a refresh now that queries are registered so sensors populate immediately
+        await cloud_coordinator.async_config_entry_first_refresh()
+
+    async_add_entities(sensors)
+
+
+def get_local_sensors(client: TritonNetClient, sitename: str) -> list[SensorEntity]:
+    """Return the full list of Local WebSocket sensors."""
     sensors = []
 
     # --- DIAGNOSTICS (Always Available) ---
@@ -136,10 +183,37 @@ async def async_setup_entry(
                                    unit=UnitOfFrequency.HERTZ, 
                                    state_class=SensorStateClass.MEASUREMENT))
 
-    async_add_entities(sensors)
+    return sensors
 
 
-class TritonNetSensor(TritonNetEntity, SensorEntity):
+# =============================================================================
+#  ENTITY CLASSES
+# =============================================================================
+
+class TritonNetCloudSensor(TritonNetPowerwallCloudConnectorEntity, SensorEntity):
+    """Sensor for Postgres Cloud Data (polled via Coordinator)."""
+
+    def __init__(self, coordinator, sitename, name, key, unit=None, device_class=None, state_class=None):
+        """Initialize the cloud sensor."""
+        super().__init__(coordinator, sitename)
+        self._key = key
+        
+        self._attr_name = name
+        self._attr_unique_id = get_cloud_entity_unique_id(sitename, key)
+        self._attr_native_unit_of_measurement = unit
+        self._attr_device_class = device_class
+        self._attr_state_class = state_class
+
+    @property
+    def native_value(self):
+        """Return the value from the coordinator data."""
+        # Ensure data exists and is a dictionary before accessing
+        if not self.coordinator.data:
+            return None
+        return self.coordinator.data.get(self._key)
+
+
+class TritonNetSensor(TritonNetPowerwallLocalConnectorEntity, SensorEntity):
     """Generic Sensor for values from the C# WebSocket stream."""
 
     def __init__(self, client, sitename, name, json_key, device_class=None, unit=None, state_class=None, icon=None):
@@ -161,14 +235,14 @@ class TritonNetSensor(TritonNetEntity, SensorEntity):
         return self.client.data.get(self._json_key)
 
 
-class TritonNetConnectionStatus(TritonNetEntity, SensorEntity):
+class TritonNetConnectionStatus(TritonNetPowerwallLocalConnectorEntity, SensorEntity):
     """
     Reports the status of the connection. 
     If connected, it reports the Powerwall Status (e.g. SystemGridConnected).
     If disconnected, it reports the Connection State (e.g. Connecting, Retrying).
     This entity NEVER goes unavailable.
     """
-    _attr_name = "Service Connection"
+    _attr_name = "Connection Status"
     _attr_icon = "mdi:ethernet"
     _attr_entity_category = EntityCategory.DIAGNOSTIC 
 
@@ -193,7 +267,7 @@ class TritonNetConnectionStatus(TritonNetEntity, SensorEntity):
         return self.client.status
 
 
-class TritonNetLastUpdateSensor(TritonNetEntity, SensorEntity):
+class TritonNetLastUpdateSensor(TritonNetPowerwallLocalConnectorEntity, SensorEntity):
     """
     Reports the timestamp of the last message received from the C# service.
     This entity NEVER goes unavailable.
@@ -201,8 +275,6 @@ class TritonNetLastUpdateSensor(TritonNetEntity, SensorEntity):
     _attr_device_class = SensorDeviceClass.TIMESTAMP
     _attr_name = "Last Update"
     _attr_icon = "mdi:clock-check-outline"
-    
-    # FIX: Use EntityCategory Enum, not string
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(self, client, sitename):

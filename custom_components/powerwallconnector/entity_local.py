@@ -4,11 +4,11 @@ from __future__ import annotations
 from homeassistant.helpers.entity import Entity
 from .client import TritonNetClient
 
-class TritonNetEntity(Entity):
-    """Base class for all TritonNET entities."""
+class TritonNetPowerwallLocalConnectorEntity(Entity):
+    """Base class for Local (WebSocket) entities."""
 
     _attr_has_entity_name = True
-    _attr_should_poll = False  # We are Push-based now
+    _attr_should_poll = False
 
     def __init__(self, client: TritonNetClient, sitename: str) -> None:
         """Initialize the entity."""
@@ -16,7 +16,7 @@ class TritonNetEntity(Entity):
         self._sitename = sitename
         self._attr_device_info = {
             "identifiers": {( "powerwallconnector", sitename )},
-            "name": f"Powerwall Connector: {sitename}",
+            "name": f"PW Local Con {sitename}",
             "manufacturer": "Tesla / TritonNET",
             "model": "TritonNET Powerwall Monitor (Local)",
         }
