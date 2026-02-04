@@ -1,12 +1,14 @@
 {
   "domain": "powerwallconnector",
   "name": "TritonNET Powerwall Connector",
-  "version": "3.0",
+  "version": "4.0",
   "documentation": "https://github.com/TritonNET/ha-powerwallconnector.git",
   "dependencies": [],
   "codeowners": [
     "@TritonNET"
   ],
-  "requirements": [ "asyncpg==0.31.0" ],
+  "requirements": [
+    "asyncpg==0.31.0"
+  ],
   "iot_class": "local_polling"
 }
