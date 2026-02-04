@@ -70,21 +70,22 @@ class TritonNetCloudCoordinator(DataUpdateCoordinator):
         data = {}
         
         # --- TIMEZONE FIX ---
-        # 1. Get the start of the day in LOCAL TIME (e.g., 00:00 NZDT)
-        start_of_local_day = dt_util.start_of_local_day()
+        # The database stores timestamps in Local Time.
+        # We must query using Local Time (Naive) to match the database records.
+        # Previously, converting to UTC shifted the query back 13 hours (into yesterday).
         
-        # 2. Convert that specific instant to UTC for the database query
-        # (Assuming your DB stores timestamps in UTC)
-        start_of_day_utc = dt_util.as_utc(start_of_local_day)
+        # 1. Get Start of Day in Local Time (e.g. 2026-02-04 00:00:00)
+        # .replace(tzinfo=None) strips the timezone so asyncpg treats it as a plain timestamp
+        start_of_day = dt_util.start_of_local_day().replace(tzinfo=None)
         
-        # 3. Calculate End of Day (Start + 24h)
-        end_of_day_utc = start_of_day_utc + timedelta(days=1)
+        # 2. End of Day is just +1 Day
+        end_of_day = start_of_day + timedelta(days=1)
 
         async with self._pool.acquire() as connection:
             for key, sql in self.queries.items():
                 try:
-                    # Pass the corrected UTC timestamps to the query
-                    row = await connection.fetchrow(sql, start_of_day_utc, end_of_day_utc)
+                    # Pass the Naive Local timestamps directly to the query
+                    row = await connection.fetchrow(sql, start_of_day, end_of_day)
                     
                     if row:
                         val = row.get("value") if "value" in row else row[0]
